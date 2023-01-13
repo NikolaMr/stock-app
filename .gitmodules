@@ -1,0 +1,6 @@
+[submodule "informer/repo"]
+	path = informer/repo
+	url = git@github.com:NikolaMr/stock-informer.git
+[submodule "bot/repo"]
+	path = bot/repo
+	url = git@github.com:NikolaMr/stock-bot.git

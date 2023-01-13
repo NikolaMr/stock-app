@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+  duckling:
+    image: rasa/duckling
+  bot:
+    image: stock-app/bot
+    build:
+      context: bot
+      dockerfile: bot.dockerfile
+    ports:
+      - "5005:5005"
+    command:
+      - run
+    environment:
+      - RASA_ACTION_ENDPOINT=http://bot-action-server:5055/webhook
+      - RASA_DUCKLING_HTTP_URL=http://duckling:8000
+    volumes:
+      - ../stock-bot/models:/app/models
+    depends_on:
+      - duckling
+      - bot-action-server
+  bot-action-server:
+    image: stock-app/bot-action-server
+    build:
+      context: bot
+      dockerfile: bot-action-server.dockerfile
+    environment:
+      BROKER_API_URL: http://informer:5000
+    expose:
+      - 5055
+  informer:
+    image: stock-app/informer
+    build:
+      context: informer
+      dockerfile: informer.dockerfile
+    expose:
+      - 5000
+    command: uvicorn stock_informer_server:app --port 5000 --host 0.0.0.0
