@@ -17,10 +17,10 @@ tracker_store:
 # Event broker which all conversation events should be streamed to.
 # https://rasa.com/docs/rasa/event-brokers
 
-#event_broker:
-#  type: pika
-#  url: ${RABBITMQ_URL}
-#  username: ${RABBITMQ_USERNAME}
-#  password: ${RABBITMQ_PASSWORD}
-#  queue: ${RABBITMQ_QUEUE}
-#  exchange_name:
+event_broker:
+  type: pika
+  url: ${RABBITMQ_URL}
+  username: ${RABBITMQ_USERNAME}
+  password: ${RABBITMQ_PASSWORD}
+  queues:
+    - ${RABBITMQ_QUEUE}

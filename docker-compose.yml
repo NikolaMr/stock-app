@@ -2,9 +2,13 @@ version: '3'
 
 services:
   duckling:
-    image: rasa/duckling
+    restart: always
+    image: rasa/duckling:0.2.0.2-r1
+    expose:
+      - 8000
   bot:
     image: stock-app/bot
+    restart: always
     build:
       context: bot
       dockerfile: bot.dockerfile
@@ -12,28 +16,36 @@ services:
       - "5005:5005"
     command:
       - run
+      - --debug
     environment:
-      - RASA_ACTION_ENDPOINT=http://bot-action-server:5055/webhook
-      - RASA_DUCKLING_HTTP_URL=http://duckling:8000
-      - MONGODB_URL=mongodb://mongodb:27017
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      RASA_ACTION_ENDPOINT: http://bot-action-server:5055/webhook
+      RASA_DUCKLING_HTTP_URL: http://duckling:8000
+      MONGODB_URL: mongodb://mongodb:27017
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      RABBITMQ_URL: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
     volumes:
       - ../stock-bot/models:/app/models
     depends_on:
       - duckling
-      - bot-action-server
       - mongodb
+      - rabbitmq
   mongodb:
-    image: mongo
+    image: mongo:6.0.1
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - ./db:/data/db:rw
+    expose:
+      - 27017
   mongo-express: # this service is a MongoDB UI, and is optional
-    image: mongo-express
+    image: mongo-express:0.54.0
+    restart: always
     ports:
       - 8081:8081
     environment:
@@ -45,6 +57,7 @@ services:
       - mongodb
   bot-action-server:
     image: stock-app/bot-action-server
+    restart: always
     build:
       context: bot
       dockerfile: bot-action-server.dockerfile
@@ -52,11 +65,40 @@ services:
       BROKER_API_URL: http://informer:5000
     expose:
       - 5055
+    depends_on:
+      - bot
   informer:
     image: stock-app/informer
+    restart: always
     build:
       context: informer
       dockerfile: informer.dockerfile
     expose:
       - 5000
     command: uvicorn stock_informer_server:app --port 5000 --host 0.0.0.0
+  rabbitmq:
+    image: bitnami/rabbitmq:3.11.6
+    restart: always
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    ports:
+      - 15672:15672
+      - 5672:5672
+    volumes:
+      - ./bot/rabbitmq.conf:/bitnami/rabbitmq/conf/custom.conf:ro
+  mq_consumer:
+    image: stock-app/mq_consumer
+    restart: always
+    build:
+      context: mq_consumer
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
+    command: python -u mq_consumer.py
+    depends_on:
+    - rabbitmq
